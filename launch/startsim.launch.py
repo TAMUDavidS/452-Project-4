@@ -18,11 +18,11 @@ def generate_launch_description():
 
     use_sim_time = LaunchConfiguration('use_sim_time', default='false')
     #robot_file   = LaunchConfiguration('robot_file', default='normal.robot')
-    robot_file = 'robots/normal.robot'
+    robot_file = 'robots/ideal.robot'
 
     robot = disc_robot.load_disc_robot(robot_file)
     robots = json.dumps(robot)
-    print(robots)
+    #print(robots)
     robot_desc  = disc_robot.disc_robot_urdf(robot)
 
     return LaunchDescription([

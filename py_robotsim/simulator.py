@@ -60,13 +60,13 @@ class Simulator(Node):
         # State broadcaster
         qos_profile = QoSProfile(depth=10)
         self.broadcaster = TransformBroadcaster(self, qos=qos_profile)
-        #self.joint_pub = self.create_publisher(JointState, 'joint_states', qos_profile)
+        self.joint_pub = self.create_publisher(JointState, 'joint_states', qos_profile)
 
     # Broadcaster
     def broadcast(self):
         odom_trans = TransformStamped()
-        odom_trans.header.frame_id = 'odom'
-        odom_trans.child_frame_id = 'axis'
+        odom_trans.header.frame_id = 'heading_box'
+        odom_trans.child_frame_id = 'world'
         joint_state = JointState()
 
         # update joint_state
@@ -85,16 +85,23 @@ class Simulator(Node):
             euler_to_quaternion(0, 0, self.theta) # roll,pitch,yaw
 
         # send the joint state and transform
-        #self.joint_pub.publish(joint_state)
+        self.joint_pub.publish(joint_state)
         self.broadcaster.sendTransform(odom_trans)
 
     # Update position
     def update_position(self):
+        #self.get_logger().info("Time: {} {}".format(self.time_out_counter, self.time_out))
+        if self.time_out:
+            self.left_vel  = 0.0
+            self.right_vel = 0.0
+
         # Get input variables
         R = self.get_radius()
         w = self.get_angular_vel()
         c = self.get_ICC(R)
         dt = TIMESCALE
+
+        #self.get_logger().info("R: {} w: {} c: {} {}".format(R,w,c[0],c[1]))
 
         # Calculate new position
         A = np.matrix([[cos(w*dt), -sin(w*dt), 0],
@@ -102,9 +109,9 @@ class Simulator(Node):
                        [0        , 0,          1]])
         B = np.matrix([[self.x-c[0], self.y-c[1], self.theta]]).transpose()
         C = np.matrix([[c[0], c[1], w*dt]]).transpose()
-        self.get_logger().info("B: {} C: {}".format(B.shape, C.shape))
-        result_matrix = A*B
-        #result_matrix = result_matrix+C
+        #self.get_logger().info("B: {} C: {}".format(B.shape, C.shape))
+        result_matrix = np.matmul(A, B)
+        result_matrix = np.add(result_matrix,C)
 
         # Update postion
         self.x = result_matrix.item(0)
@@ -120,11 +127,13 @@ class Simulator(Node):
     
     # Get angular velocity
     def get_angular_vel(self):
-        return (self.right_vel-self.left_vel)/self.l
+        return float((self.right_vel-self.left_vel)/self.l)
     
     # Get ICC
     def get_ICC(self, R):
-        return (self.x-R*sin(self.theta),self.y+R*cos(self.theta))
+        x = float(self.x-R*sin(self.theta))
+        y = float(self.y+R*cos(self.theta))
+        return (x,y)
 
     # Update left wheel velocity
     def update_left(self, velocity):
@@ -142,26 +151,21 @@ class Simulator(Node):
         if self.time_out_counter <= 0:
             self.time_out_counter = True
     
-    # Reset velocity time out
-    def reset_timer(self):
-        self.time_out = False
-        self.time_out_counter = 1/TIMESCALE
-    
     # Update velocity time out
     def update_timeout(self):
-        self.time_out_counter = self.time_out_counter-1
-        if self.time_out_counter <= 0:
-            self.time_out_counter = True
+        self.time_out_counter = self.time_out_counter+TIMESCALE
+        if self.time_out_counter >= 1:
+            self.time_out = True
     
     # Reset velocity time out
     def reset_timer(self):
         self.time_out = False
-        self.time_out_counter = 1/TIMESCALE
+        self.time_out_counter = 0.0
     
     # Update error on gaussian distribution
     def update_error(self):
-        self.error_left  = np.random.normal(1.0, sqrt(self.error_left_base), 1)
-        self.error_right = np.random.normal(1.0, sqrt(self.error_right_base), 1)
+        self.error_left  = np.random.normal(1.0, sqrt(self.error_left_base), 1) if not self.error_left_base == 0.0 else 1.0
+        self.error_right = np.random.normal(1.0, sqrt(self.error_right_base), 1) if not self.error_right_base == 0.0 else 1.0
 
 # Helper function for broadcasting input
 def euler_to_quaternion(roll, pitch, yaw):
