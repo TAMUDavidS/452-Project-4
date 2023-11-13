@@ -25,7 +25,7 @@ setup(
     entry_points={
         'console_scripts': [
             'simulator = py_robotsim.simulator:main',
-            #'velocity_transfer = py_robotsim.velocity_transfer:main',
+            'translator = py_robotsim.translator:main',
         ],
     },
 )
