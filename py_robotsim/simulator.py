@@ -1,16 +1,18 @@
 import rclpy
 from rclpy.node import Node
-from std_msgs.msg import Float64
-from math import cos, sin, sqrt, floor
-import numpy as np
 from rclpy.qos import QoSProfile
+
 from sensor_msgs.msg import JointState
-from tf2_ros import TransformBroadcaster, TransformStamped
-from rclpy.qos import QoSProfile
 from geometry_msgs.msg import Quaternion
 from sensor_msgs.msg import JointState
-from tf2_ros import TransformBroadcaster, TransformStamped
 from nav_msgs.msg import OccupancyGrid
+from std_msgs.msg import Float64
+
+from tf2_ros import TransformBroadcaster, TransformStamped
+
+from math import cos, sin, sqrt, floor, nan
+import numpy as np
+
 import json
 
 # Resources:
@@ -196,10 +198,43 @@ class Simulator(Node):
     
     # TODO: Simulate lidar scans
     def lidar_scan(self):
-        return
+        # Calculate span of angles to conduct scans
+        count = self.robot["laser"]["count"]
+        angle_span = self.robot["laser"]["angle_max"]-self.robot["laser"]["angle_min"]
+        angle = self.robot["laser"]["angle_min"]
+        step = angle_span/count
+        
+        # Robot position
+        pos = self.get_grid_pos()
+        posX = pos[0]
+        posY = pos[1]
+
+        scans = []
+
+        # Test ray collision at each step
+        for i in range(0,count):
+            # Check if scan fails
+            fail = True if np.random() < self.robot["laser"]["fail_probability"] else False
+
+            # Check for collision
+            ray = self.raycast(self.robot["laser"]["range_min"],self.robot["laser"]["range_max"],
+                         angle, posX, posY)
+            
+            # Check if there was a collision
+            if ray[0] and not fail:
+                dist = ray[3]
+                error = np.random.normal(0.0, sqrt(self.robot["laser"]["error_variance"]), 1)
+                dist += error
+                scans.append(dist)
+            else:
+                scans.append(nan)
+            
+            angle += step
+
+        return scans
     
     # TODO: Check for line collision
-    def raycast(self):
+    def raycast(self, range_min, range_max, angle, posX, posY):
         # Robot position
         posX = 0
         posY = 0
@@ -257,7 +292,7 @@ class Simulator(Node):
             #Check if ray has hit a wall
             if worldMap[mapX][mapY] > 0: hit = 1
 
-        return
+        return (hit, mapX, mapY, dist)
         
 
 # Helper function for broadcasting input
