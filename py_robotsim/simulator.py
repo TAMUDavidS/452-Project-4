@@ -13,7 +13,9 @@ from tf2_ros import TransformBroadcaster, TransformStamped
 from nav_msgs.msg import OccupancyGrid
 import json
 
-# Resource: https://docs.ros.org/en/foxy/Tutorials/Intermediate/URDF/Using-URDF-with-Robot-State-Publisher.html
+# Resources:
+# https://docs.ros.org/en/foxy/Tutorials/Intermediate/URDF/Using-URDF-with-Robot-State-Publisher.html
+# https://lodev.org/cgtutor/raycasting.html
 
 # How often the timer will listen for updates
 TIMESCALE = 0.01
@@ -198,6 +200,63 @@ class Simulator(Node):
     
     # TODO: Check for line collision
     def raycast(self):
+        # Robot position
+        posX = 0
+        posY = 0
+
+        #which box of the map we're in
+        mapX = int(posX)
+        mapY = int(posY)
+
+        # ray dir
+        rayDirX = 0
+        rayDirY = 0
+
+        #length of ray from current position to next x or y-side
+        sideDistX = 0
+        sideDistY = 0
+
+        #length of ray from one x or y-side to next x or y-side
+        deltaDistX =  1e30 if rayDirX == 0 else abs(1 / rayDirX)
+        deltaDistY =  1e30 if rayDirY == 0 else abs(1 / rayDirY)
+        perpWallDist = 0
+
+        #that direction to step in x or y-direction (either +1 or -1)
+        stepX = 0
+        stepY = 0
+
+        hit = 0  #was there a wall hit?
+        side = 0 #was a NS or a EW wall hit?
+
+        #calculate step and initial sideDist
+        if rayDirX < 0:
+            stepX = -1
+            sideDistX = (posX - mapX) * deltaDistX
+        else:
+            stepX = 1
+            sideDistX = (mapX + 1.0 - posX) * deltaDistX
+        
+        if rayDirY < 0:
+            stepY = -1
+            sideDistY = (posY - mapY) * deltaDistY
+        else:
+            stepY = 1
+            sideDistY = (mapY + 1.0 - posY) * deltaDistY
+
+        #perform DDA
+        while (hit == 0):
+            #jump to next map square, either in x-direction, or in y-direction
+            if sideDistX < sideDistY:
+                sideDistX += deltaDistX
+                mapX += stepX
+                side = 0
+            else:
+                sideDistY += deltaDistY
+                mapY += stepY
+                side = 1
+            #Check if ray has hit a wall
+            if worldMap[mapX][mapY] > 0: hit = 1
+
         return
         
 
