@@ -1,7 +1,7 @@
 import rclpy
 from rclpy.node import Node
 from std_msgs.msg import Float64
-from math import cos, sin, sqrt
+from math import cos, sin, sqrt, floor
 import numpy as np
 from rclpy.qos import QoSProfile
 from sensor_msgs.msg import JointState
@@ -10,6 +10,7 @@ from rclpy.qos import QoSProfile
 from geometry_msgs.msg import Quaternion
 from sensor_msgs.msg import JointState
 from tf2_ros import TransformBroadcaster, TransformStamped
+from nav_msgs.msg import OccupancyGrid
 import json
 
 # Resource: https://docs.ros.org/en/foxy/Tutorials/Intermediate/URDF/Using-URDF-with-Robot-State-Publisher.html
@@ -62,7 +63,12 @@ class Simulator(Node):
         self.broadcaster = TransformBroadcaster(self, qos=qos_profile)
         self.joint_pub = self.create_publisher(JointState, 'joint_states', qos_profile)
 
+        # Map subscriber
+        map_subscriber = self.create_subscribtion(OccupancyGrid, '/map', self.update_map, 10)
+        self.map = OccupancyGrid()
+
     # Broadcaster
+    # TODO: Lidar transform
     def broadcast(self):
         odom_trans = TransformStamped()
         odom_trans.header.frame_id = 'heading_box'
@@ -89,6 +95,7 @@ class Simulator(Node):
         self.broadcaster.sendTransform(odom_trans)
 
     # Update position
+    # TODO: Check for collision and stop
     def update_position(self):
         #self.get_logger().info("Time: {} {}".format(self.time_out_counter, self.time_out))
         if self.time_out:
@@ -145,6 +152,10 @@ class Simulator(Node):
         self.right_vel = velocity.data*self.error_right
         self.reset_timer()
     
+    # Get map
+    def update_map(self, map):
+        self.map = map
+
     # Update velocity time out
     def update_timeout(self):
         self.time_out_counter = self.time_out_counter-1
@@ -166,6 +177,29 @@ class Simulator(Node):
     def update_error(self):
         self.error_left  = np.random.normal(1.0, sqrt(self.error_left_base), 1) if not self.error_left_base == 0.0 else 1.0
         self.error_right = np.random.normal(1.0, sqrt(self.error_right_base), 1) if not self.error_right_base == 0.0 else 1.0
+    
+    # Get grid location of robot on the map
+    def get_grid_pos(self):
+        dx = self.x/self.map.info.resolution
+        dy = self.y/self.map.info.resolution
+        xg = floor(dx)
+        yg = floor(dy)
+        xe = dx-xg
+        ye = dy-yg
+        return (xg,yg,xe,ye)
+
+    # TODO: Check if the robot has encountered a wall
+    def check_collision(self):
+        return True
+    
+    # TODO: Simulate lidar scans
+    def lidar_scan(self):
+        return
+    
+    # TODO: Check for line collision
+    def raycast(self):
+        return
+        
 
 # Helper function for broadcasting input
 def euler_to_quaternion(roll, pitch, yaw):
