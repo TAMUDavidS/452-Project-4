@@ -2,7 +2,6 @@ import rclpy
 from rclpy.node import Node
 from rclpy.qos import QoSProfile
 
-from sensor_msgs.msg import JointState
 from geometry_msgs.msg import Quaternion
 from sensor_msgs.msg import JointState, LaserScan
 from nav_msgs.msg import OccupancyGrid
@@ -23,6 +22,7 @@ import json
 TIMESCALE = 0.01
 
 # Node that simulates robot motion
+# TODO: get robot initial position
 class Simulator(Node):
     def __init__(self):
         super().__init__("simulator_node")
@@ -57,8 +57,8 @@ class Simulator(Node):
         self.right_vel = 0.0
 
         # Position and orientation
-        self.x = 0.0
-        self.y = 0.0
+        self.x = 1.0
+        self.y = 2.2
         self.theta = 0.0
         self.l = self.robot['wheels']['distance']
 
@@ -68,8 +68,8 @@ class Simulator(Node):
         self.joint_pub = self.create_publisher(JointState, 'joint_states', qos_profile)
 
         # Map subscriber
-        map_subscriber = self.create_subscribtion(OccupancyGrid, '/map', self.update_map, 10)
         self.map = OccupancyGrid()
+        map_subscriber = self.create_subscription(OccupancyGrid, '/map', self.update_map, 10)
 
         # Lidar publisher
         self.lidar_seq = 0
@@ -77,7 +77,7 @@ class Simulator(Node):
         self.lidar_timer = self.create_timer(self.robot["laser"]["rate"], self.publish_scan)
 
     # Broadcaster
-    # TODO: Lidar transform
+    # TODO: Fix transforms
     def broadcast(self):
         odom_trans = TransformStamped()
         odom_trans.header.frame_id = 'heading_box'
@@ -91,10 +91,9 @@ class Simulator(Node):
         joint_state.position = [0., 0., 0.]
 
         # update transform
-        # (moving in a circle with radius=2)
         odom_trans.header.stamp = now.to_msg()
-        odom_trans.transform.translation.x = float(self.x)
-        odom_trans.transform.translation.y = float(self.y)
+        odom_trans.transform.translation.x = -float(self.x)
+        odom_trans.transform.translation.y = -float(self.y)
         odom_trans.transform.translation.z = 0.0
         odom_trans.transform.rotation = \
             euler_to_quaternion(0, 0, self.theta) # roll,pitch,yaw
@@ -104,7 +103,6 @@ class Simulator(Node):
         self.broadcaster.sendTransform(odom_trans)
 
     # Update position
-    # TODO: Check for collision and stop
     def obstacle_contact(self, x, y):
         # Check if point is inside an obstacle
         if self.map.info.resolution == 0.0:
@@ -197,6 +195,10 @@ class Simulator(Node):
     # Get map
     def update_map(self, map):
         self.map = map
+        self.get_logger().info("Map Loaded")
+        #self.x = self.map.info.origin.position.x
+        #self.y = self.map.info.origin.position.y
+        # TODO: get angle from quaternion
 
     # Update velocity time out
     def update_timeout(self):
@@ -232,25 +234,31 @@ class Simulator(Node):
     
     # Publish lidar scan
     def publish_scan(self):
-        laserscan = LaserScan
+        laserscan = LaserScan()
         
         # Header message
-        laserscan.header.seq = self.lidar_seq
-        laserscan.header.stamp = self.get_clock().now().to_msg()
-        laserscan.header.frame_id = ''
+        header = Header()
+        #header.seq = self.lidar_seq
+        header.stamp = self.get_clock().now().to_msg()
+        header.frame_id = 'laser'
+        laserscan.header = header
 
         # Scan info
         laserscan.angle_min = self.robot["laser"]["angle_min"]
         laserscan.angle_max = self.robot["laser"]["angle_max"]
         laserscan.angle_increment = (self.robot["laser"]["angle_max"]-self.robot["laser"]["angle_min"])/self.robot["laser"]["count"]
-        laserscan.scan_time = self.robot["laser"]["rate"]
-        laserscan.rang_min = self.robot["laser"]["range_min"]
-        laserscan.rang_max = self.robot["laser"]["range_max"]
+        laserscan.scan_time = float(self.robot["laser"]["rate"])
+        laserscan.range_min = self.robot["laser"]["range_min"]
+        laserscan.range_max = self.robot["laser"]["range_max"]
 
         # Scan data
-        laserscan.ranges = self.lidar_scan()
+        if self.map.info.resolution == 0.0:
+            self.get_logger().info("{}".format(self.map.info))
+            laserscan.ranges = [nan] * self.robot["laser"]["count"]
+        else:
+            laserscan.ranges = self.lidar_scan()
 
-        return laserscan
+        self.lidar_pub.publish(laserscan)
 
     # Simulate lidar scans
     def lidar_scan(self):
@@ -270,7 +278,11 @@ class Simulator(Node):
         # Test ray collision at each step
         for i in range(0,count):
             # Check if scan fails
-            fail = True if np.random() < self.robot["laser"]["fail_probability"] else False
+            self.get_logger().info("{} < {}".format(np.random(),self.robot["laser"]["fail_probability"]))
+            if np.random() < self.robot["laser"]["fail_probability"]:
+                fail = True
+            else: 
+                fail = False
 
             # Check for collision
             ray = self.raycast(self.robot["laser"]["range_max"], angle, posX, posY)

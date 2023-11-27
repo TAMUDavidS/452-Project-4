@@ -19,6 +19,7 @@ def generate_launch_description():
     use_sim_time = LaunchConfiguration('use_sim_time', default='false')
     #robot_file   = LaunchConfiguration('robot_file', default='normal.robot')
     robot_file = 'robots/ideal.robot'
+    world_file = 'worlds/brick.world'
 
     robot = disc_robot.load_disc_robot(robot_file)
     robots = json.dumps(robot)
@@ -44,9 +45,13 @@ def generate_launch_description():
         Node(
             package='py_robotsim',
             executable='simulator',
-            parameters=[{'test': 1, 'robot': robots}]),
+            parameters=[{'robot': robots}]),
         Node(
             package='py_robotsim',
             executable='translator',
             parameters=[]),
+        Node(
+            package='py_robotsim',
+            executable='map',
+            parameters=[{'filename': world_file}]),
     ])

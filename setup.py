@@ -26,6 +26,7 @@ setup(
         'console_scripts': [
             'simulator = py_robotsim.simulator:main',
             'translator = py_robotsim.translator:main',
+            'map = py_robotsim.map:main',
         ],
     },
 )

@@ -5,20 +5,20 @@ from std_msgs.msg import Header
 from nav_msgs.msg import MapMetaData, OccupancyGrid
 from geometry_msgs.msg import Pose, Point, Quaternion
 
-from simulator import euler_to_quaternion
+from math import sin, cos
 
 import yaml
 
 # Get width and height of map file by counting linebreaks
 # TODO: Check for extra spaces and blank lines
 def get_width_height(map):
-    heigth = 0
+    height = 1
     stripped = map["map"].strip()
     for i in stripped:
         if i == '\n':
             height += 1
-
-    map["width"] = (len(stripped)-height)/height
+    map["map"] = stripped.replace('\n','')
+    map["width"] = int(len(map["map"])/height)
     map["height"] = height
     return map
 
@@ -32,12 +32,13 @@ def load_map(file_name):
 # Load and publish a map
 class MapLoader(Node):
     def __init__(self):
-        super.__init__("Map Loader Node")
+        super().__init__("map_loader_node")
 
         # Get map file
         self.declare_parameter('filename', "")
         filename = self.get_parameter('filename').get_parameter_value().string_value
         self.map = load_map(filename)
+        #self.get_logger().info("{}".format(self.map))
 
         # Map message data
         self.seq = 0
@@ -56,7 +57,7 @@ class MapLoader(Node):
     
     def get_header(self):
         header = Header()
-        header.seq = self.seq
+        #header.seq = self.seq
         header.stamp = self.get_clock().now().to_msg()
         header.frame_id = 'world'
         self.seq += 1
@@ -72,11 +73,9 @@ class MapLoader(Node):
 
         origin = Pose()
         point = Point()
-        point.x = self.map["initial_pose"][0]
-        point.y = self.map["initial_pose"][1]
-        orient = euler_to_quaternion(0,0,self.map["initial_pose"][2])
+        #point.x = -self.map["width"]*self.map["resolution"]
+        #point.y = -self.map["height"]*self.map["resolution"]
         origin.position = point
-        origin.orientation = orient
         metadata.origin = origin
 
         return metadata
@@ -90,8 +89,14 @@ class MapLoader(Node):
                 data.append(0)
         
         return data
-        
 
+# Helper function for broadcasting input
+def euler_to_quaternion(roll, pitch, yaw):
+    qx = sin(roll/2) * cos(pitch/2) * cos(yaw/2) - cos(roll/2) * sin(pitch/2) * sin(yaw/2)
+    qy = cos(roll/2) * sin(pitch/2) * cos(yaw/2) + sin(roll/2) * cos(pitch/2) * sin(yaw/2)
+    qz = cos(roll/2) * cos(pitch/2) * sin(yaw/2) - sin(roll/2) * sin(pitch/2) * cos(yaw/2)
+    qw = cos(roll/2) * cos(pitch/2) * cos(yaw/2) + sin(roll/2) * sin(pitch/2) * sin(yaw/2)
+    return Quaternion(x=qx, y=qy, z=qz, w=qw)
 
 def main():
     rclpy.init()
