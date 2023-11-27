@@ -4,9 +4,9 @@ from rclpy.qos import QoSProfile
 
 from sensor_msgs.msg import JointState
 from geometry_msgs.msg import Quaternion
-from sensor_msgs.msg import JointState
+from sensor_msgs.msg import JointState, LaserScan
 from nav_msgs.msg import OccupancyGrid
-from std_msgs.msg import Float64
+from std_msgs.msg import Float64, Header
 
 from tf2_ros import TransformBroadcaster, TransformStamped
 
@@ -71,6 +71,11 @@ class Simulator(Node):
         map_subscriber = self.create_subscribtion(OccupancyGrid, '/map', self.update_map, 10)
         self.map = OccupancyGrid()
 
+        # Lidar publisher
+        self.lidar_seq = 0
+        self.lidar_pub = self.create_publisher(LaserScan, '/scan', 10)
+        self.lidar_timer = self.create_timer(self.robot["laser"]["rate"], self.publish_scan)
+
     # Broadcaster
     # TODO: Lidar transform
     def broadcast(self):
@@ -126,13 +131,11 @@ class Simulator(Node):
     # Check if the robot's current position is inside an obstacle in the map
     def collision_check(self):
         
-        if self.obstacle(self.x, self.y):
+        if self.obstacle_contact(self.x, self.y):
             # Stop the robot if inside obstacle
             self.left_vel = 0.0
             self.right_vel = 0.0
             return True
-        
-
 
     def update_position(self):
         #self.get_logger().info("Time: {} {}".format(self.time_out_counter, self.time_out))
@@ -226,12 +229,30 @@ class Simulator(Node):
         xe = dx-xg
         ye = dy-yg
         return (xg,yg,xe,ye)
-
-    # TODO: Check if the robot has encountered a wall
-    def check_collision(self):
-        return True
     
-    # TODO: Simulate lidar scans
+    # Publish lidar scan
+    def publish_scan(self):
+        laserscan = LaserScan
+        
+        # Header message
+        laserscan.header.seq = self.lidar_seq
+        laserscan.header.stamp = self.get_clock().now().to_msg()
+        laserscan.header.frame_id = ''
+
+        # Scan info
+        laserscan.angle_min = self.robot["laser"]["angle_min"]
+        laserscan.angle_max = self.robot["laser"]["angle_max"]
+        laserscan.angle_increment = (self.robot["laser"]["angle_max"]-self.robot["laser"]["angle_min"])/self.robot["laser"]["count"]
+        laserscan.scan_time = self.robot["laser"]["rate"]
+        laserscan.rang_min = self.robot["laser"]["range_min"]
+        laserscan.rang_max = self.robot["laser"]["range_max"]
+
+        # Scan data
+        laserscan.ranges = self.lidar_scan()
+
+        return laserscan
+
+    # Simulate lidar scans
     def lidar_scan(self):
         # Calculate span of angles to conduct scans
         count = self.robot["laser"]["count"]
@@ -252,15 +273,17 @@ class Simulator(Node):
             fail = True if np.random() < self.robot["laser"]["fail_probability"] else False
 
             # Check for collision
-            ray = self.raycast(self.robot["laser"]["range_min"],self.robot["laser"]["range_max"],
-                         angle, posX, posY)
+            ray = self.raycast(self.robot["laser"]["range_max"], angle, posX, posY)
             
-            # Check if there was a collision
+            # Check if there was a collision and apply error
             if ray[0] and not fail:
                 dist = ray[3]
-                error = np.random.normal(0.0, sqrt(self.robot["laser"]["error_variance"]), 1)
-                dist += error
-                scans.append(dist)
+                if dist < self.robot["laser"]["range_min"]:
+                    scans.append(nan)
+                else:
+                    error = np.random.normal(0.0, sqrt(self.robot["laser"]["error_variance"]), 1)
+                    dist += error
+                    scans.append(dist)
             else:
                 scans.append(nan)
             
@@ -268,19 +291,15 @@ class Simulator(Node):
 
         return scans
     
-    # TODO: Check for line collision
-    def raycast(self, range_min, range_max, angle, posX, posY):
+    # TODO: Make sure collision is detected properly
+    def raycast(self, range_max, angle, mapX, mapY):
         # Robot position
-        posX = 0
-        posY = 0
-
-        #which box of the map we're in
-        mapX = int(posX)
-        mapY = int(posY)
+        posX = self.x
+        posY = self.y
 
         # ray dir
-        rayDirX = 0
-        rayDirY = 0
+        rayDirX = cos(angle)
+        rayDirY = sin(angle)
 
         #length of ray from current position to next x or y-side
         sideDistX = 0
@@ -296,7 +315,7 @@ class Simulator(Node):
         stepY = 0
 
         hit = 0  #was there a wall hit?
-        side = 0 #was a NS or a EW wall hit?
+        dist = 0
 
         #calculate step and initial sideDist
         if rayDirX < 0:
@@ -314,18 +333,18 @@ class Simulator(Node):
             sideDistY = (mapY + 1.0 - posY) * deltaDistY
 
         #perform DDA
-        while (hit == 0):
+        while hit == 0 and dist < range_max:
             #jump to next map square, either in x-direction, or in y-direction
             if sideDistX < sideDistY:
-                sideDistX += deltaDistX
                 mapX += stepX
-                side = 0
+                dist = sideDistX
+                sideDistX += deltaDistX
             else:
-                sideDistY += deltaDistY
                 mapY += stepY
-                side = 1
+                dist = sideDistY
+                sideDistY += deltaDistY
             #Check if ray has hit a wall
-            if worldMap[mapX][mapY] > 0: hit = 1
+            if self.obstacle_contact(mapX,mapY): hit = 1
 
         return (hit, mapX, mapY, dist)
         
