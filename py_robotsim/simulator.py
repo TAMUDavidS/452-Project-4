@@ -100,6 +100,40 @@ class Simulator(Node):
 
     # Update position
     # TODO: Check for collision and stop
+    def obstacle_contact(self, x, y):
+        # Check if point is inside an obstacle
+        if self.map.info.resolution == 0.0:
+            return False  
+
+        map_width = self.map.info.width
+        map_height = self.map.info.height
+        map_resolution = self.map.info.resolution
+        map_origin_x = self.map.info.origin.position.x
+        map_origin_y = self.map.info.origin.position.y
+
+        # Convert world to map coordinates
+        map_x = int((x - map_origin_x) / map_resolution)
+        map_y = int((y - map_origin_y) / map_resolution)
+
+        # Check for contact
+        if (0 <= map_x < map_width and 0 <= map_y < map_height):
+            index = map_x + map_y * map_width
+            cell_value = self.map.data[index]
+            return cell_value > 0  
+
+        return False
+    
+    # Check if the robot's current position is inside an obstacle in the map
+    def collision_check(self):
+        
+        if self.obstacle(self.x, self.y):
+            # Stop the robot if inside obstacle
+            self.left_vel = 0.0
+            self.right_vel = 0.0
+            return True
+        
+
+
     def update_position(self):
         #self.get_logger().info("Time: {} {}".format(self.time_out_counter, self.time_out))
         if self.time_out:
@@ -129,6 +163,7 @@ class Simulator(Node):
         self.y = result_matrix.item(1)
         self.theta = result_matrix.item(2)
 
+        self.collision_check()
         self.broadcast()
 
     
