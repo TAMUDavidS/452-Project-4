@@ -7,6 +7,8 @@ from geometry_msgs.msg import Pose, Point, Quaternion
 
 from math import sin, cos
 
+import time
+
 import yaml
 
 # Get width and height of map file by counting linebreaks
@@ -46,6 +48,7 @@ class MapLoader(Node):
 
         # Publish grid
         self.publisher = self.create_publisher(OccupancyGrid,'/map',10)
+        time.sleep(5)
         self.publisher.publish(self.get_occupancy_grid())
 
     def get_occupancy_grid(self):
