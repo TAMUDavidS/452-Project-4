@@ -30,6 +30,8 @@ class Simulator(Node):
         # Require robot file to be loaded
         self.declare_parameter('robot', "")
         self.robot = json.loads(self.get_parameter('robot').get_parameter_value().string_value)
+        self.declare_parameter('pos', "")
+        start_pos = json.loads(self.get_parameter('pos').get_parameter_value().string_value)
         #self.get_logger().info("{}".format(self.robot))
 
         
@@ -59,9 +61,9 @@ class Simulator(Node):
         self.right_vel = 0.0
 
         # Position and orientation
-        self.x = 1.0
-        self.y = 2.2
-        self.theta = 1.5
+        self.x = start_pos["initial_pose"][0]
+        self.y = start_pos["initial_pose"][1]
+        self.theta = start_pos["initial_pose"][2]
         self.l = self.robot['wheels']['distance']
         self.rad1, self.rad2, self.rad3, self.rad4, self.rad5, self.rad6, self.rad7, self.rad8 = False
         self.currentx

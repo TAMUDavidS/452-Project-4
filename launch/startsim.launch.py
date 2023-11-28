@@ -14,6 +14,12 @@ from py_robotsim import disc_robot
 
 # References: https://docs.ros.org/en/foxy/Tutorials/Intermediate/URDF/Using-URDF-with-Robot-State-Publisher.html
 
+def load_start_pos(file_name):
+    with open(file_name) as f:
+        map = yaml.safe_load(f)
+    pos = {'initial_pose': map["initial_pose"]}
+    return pos
+
 def generate_launch_description():
 
     use_sim_time = LaunchConfiguration('use_sim_time', default='false')
@@ -23,6 +29,7 @@ def generate_launch_description():
 
     robot = disc_robot.load_disc_robot(robot_file)
     robots = json.dumps(robot)
+    pos = json.dumps(load_start_pos(world_file))
     #print(robots)
     robot_desc  = disc_robot.disc_robot_urdf(robot)
 
@@ -45,7 +52,7 @@ def generate_launch_description():
         Node(
             package='py_robotsim',
             executable='simulator',
-            parameters=[{'robot': robots}]),
+            parameters=[{'robot': robots, 'pos': pos}]),
         Node(
             package='py_robotsim',
             executable='translator',
