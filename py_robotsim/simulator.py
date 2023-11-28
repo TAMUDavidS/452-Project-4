@@ -32,6 +32,8 @@ class Simulator(Node):
         self.robot = json.loads(self.get_parameter('robot').get_parameter_value().string_value)
         #self.get_logger().info("{}".format(self.robot))
 
+        
+
         # Subscribe to velocity topics
         self.left_vel_sub  = self.create_subscription(Float64, '/vl', self.update_left, 10)
         self.right_vel_sub = self.create_subscription(Float64, '/vr', self.update_right, 10)
@@ -61,7 +63,11 @@ class Simulator(Node):
         self.y = 2.2
         self.theta = 1.5
         self.l = self.robot['wheels']['distance']
-
+        self.rad1, self.rad2, self.rad3, self.rad4, self.rad5, self.rad6, self.rad7, self.rad8 = False
+        self.currentx
+        self.currenty 
+        self.newx
+        self.newy
         # State broadcaster
         qos_profile = QoSProfile(depth=10)
         self.broadcaster = TransformBroadcaster(self, qos=qos_profile)
@@ -131,12 +137,38 @@ class Simulator(Node):
         # TODO: Check more than just the robots center point
         # Note: could be potentially fixed using several evenly placed points around the robots radius
         radius = self.robot["body"]["radius"]
-        if self.obstacle_contact(self.x+radius, self.y) or self.obstacle_contact(self.x-radius, self.y) \
-            or self.obstacle_contact(self.x, self.y+radius) or self.obstacle_contact(self.x, self.y-radius):
-            # Stop the robot if inside obstacle
+        #check full radius of circle of robot for collision points
+        #radian 1
+        if self.obstacle_contact(self.x + radius, self.y):
+            rad1 = True
+        #radian 2
+        elif self.obstacle_contact(self.x + (radius * sqrt(2) / 2) , self.y + (radius * sqrt(2) / 2)):
+            rad2 = True
+        #radian 3
+        elif self.obstacle_contact(self.x , self.y + radius):
+            rad3 = True
+        #radian 4
+        elif self.obstacle_contact(self.x - (radius * sqrt(2) / 2), self.y + (radius * sqrt(2) / 2)):
+            rad4 = True
+        #radian 5
+        elif self.obstacle_contact(self.x - radius, self.y):
+            rad5 = True
+        #radian 6
+        elif self.obstacle_contact(self.x - (radius * sqrt(2) / 2), self.y - (radius * sqrt(2) / 2)):
+            rad6 = True
+        #radian 7
+        elif self.obstacle_contact(self.x , self.y - radius):
+            rad7 = True
+        #radian 8
+        elif self.obstacle_contact(self.x + (radius * sqrt(2) / 2), self.y - (radius * sqrt(2) / 2)):
+            rad8 = True
+
+        if (rad1 or rad2 or rad3 or rad4 or rad5 or rad6 or rad7 or rad8 == True) :
             self.left_vel = 0.0
             self.right_vel = 0.0
             return True
+
+
 
     def update_position(self):
         #self.get_logger().info("Time: {} {}".format(self.time_out_counter, self.time_out))
@@ -160,14 +192,38 @@ class Simulator(Node):
         C = np.matrix([[c[0], c[1], w*dt]]).transpose()
         #self.get_logger().info("B: {} C: {}".format(B.shape, C.shape))
         result_matrix = np.matmul(A, B)
-        result_matrix = np.add(result_matrix,C)
-
-        # Update postion
-        self.x = result_matrix.item(0)
-        self.y = result_matrix.item(1)
-        self.theta = result_matrix.item(2)
+        result_matrix = np.add(result_matrix, C)
 
         self.collision_check()
+        self.currentx = self.x
+        self.currenty = self.y
+        self.newx = result_matrix.item(0)
+        self.newy = result_matrix.item(1)
+        
+        #flag detection
+        if (self.currentx - result_matrix.item(0) < 0) :
+            if (self.rad1 or self.rad2 or self.rad3 or self.rad7 or self.rad8 == True) :
+                self.newx = self.currentx
+        if (self.currentx - result_matrix.item(0) > 0) :
+            if (self.rad4 or self.rad5 or self.rad6 == True) :
+                self.newx = self.currentx
+        if (self.currenty - result_matrix.item(1) < 0) :
+            if (self.rad1 or self.rad2 or self.rad3 or self.rad4 or self.rad5 == True) :
+                self.newy = self.currenty
+        if (self.currenty - result_matrix.item(1) > 0) :
+            if (self.rad6 or self.rad7 or self.rad8  == True) :
+                self.newy = self.currenty
+                
+                
+                
+                # Update postion
+                self.x = result_matrix.item(0)
+                self.y = result_matrix.item(1)
+                self.theta = result_matrix.item(2)
+
+
+
+        
         self.broadcast()
 
     
