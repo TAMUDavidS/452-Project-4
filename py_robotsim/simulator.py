@@ -65,11 +65,14 @@ class Simulator(Node):
         self.y = start_pos["initial_pose"][1]
         self.theta = start_pos["initial_pose"][2]
         self.l = self.robot['wheels']['distance']
-        self.rad1, self.rad2, self.rad3, self.rad4, self.rad5, self.rad6, self.rad7, self.rad8 = False
-        self.currentx
-        self.currenty 
-        self.newx
-        self.newy
+        self.rad1 = False
+        self.rad2 = False
+        self.rad3 = False
+        self.rad4 = False
+        self.rad5 = False
+        self.rad6 = False
+        self.rad7 = False
+        self.rad8 = False
         # State broadcaster
         qos_profile = QoSProfile(depth=10)
         self.broadcaster = TransformBroadcaster(self, qos=qos_profile)
@@ -139,35 +142,43 @@ class Simulator(Node):
         # TODO: Check more than just the robots center point
         # Note: could be potentially fixed using several evenly placed points around the robots radius
         radius = self.robot["body"]["radius"]
+        self.rad1 = False
+        self.rad2 = False
+        self.rad3 = False
+        self.rad4 = False
+        self.rad5 = False
+        self.rad6 = False
+        self.rad7 = False
+        self.rad8 = False
         #check full radius of circle of robot for collision points
-        #radian 1
+        #radian 0
         if self.obstacle_contact(self.x + radius, self.y):
-            rad1 = True
-        #radian 2
+            self.rad1 = True
+        #radian 45
         elif self.obstacle_contact(self.x + (radius * sqrt(2) / 2) , self.y + (radius * sqrt(2) / 2)):
-            rad2 = True
-        #radian 3
+            self.rad2 = True
+        #radian 90
         elif self.obstacle_contact(self.x , self.y + radius):
-            rad3 = True
-        #radian 4
+            self.rad3 = True
+        #radian 135
         elif self.obstacle_contact(self.x - (radius * sqrt(2) / 2), self.y + (radius * sqrt(2) / 2)):
-            rad4 = True
-        #radian 5
+            self.rad4 = True
+        #radian 180
         elif self.obstacle_contact(self.x - radius, self.y):
-            rad5 = True
-        #radian 6
+            self.rad5 = True
+        #radian 225
         elif self.obstacle_contact(self.x - (radius * sqrt(2) / 2), self.y - (radius * sqrt(2) / 2)):
-            rad6 = True
-        #radian 7
+            self.rad6 = True
+        #radian 270
         elif self.obstacle_contact(self.x , self.y - radius):
-            rad7 = True
-        #radian 8
+            self.rad7 = True
+        #radian 315
         elif self.obstacle_contact(self.x + (radius * sqrt(2) / 2), self.y - (radius * sqrt(2) / 2)):
-            rad8 = True
+            self.rad8 = True
 
-        if (rad1 or rad2 or rad3 or rad4 or rad5 or rad6 or rad7 or rad8 == True) :
-            self.left_vel = 0.0
-            self.right_vel = 0.0
+        if (self.rad1 or self.rad2 or self.rad3 or self.rad4 or self.rad5 or self.rad6 or self.rad7 or self.rad8) :
+            #self.left_vel = 0.0
+            #self.right_vel = 0.0
             return True
 
 
@@ -197,34 +208,31 @@ class Simulator(Node):
         result_matrix = np.add(result_matrix, C)
 
         self.collision_check()
-        self.currentx = self.x
-        self.currenty = self.y
-        self.newx = result_matrix.item(0)
-        self.newy = result_matrix.item(1)
+        currentx = self.x
+        currenty = self.y
+        newx = result_matrix.item(0)
+        newy = result_matrix.item(1)
         
         #flag detection
-        if (self.currentx - result_matrix.item(0) < 0) :
-            if (self.rad1 or self.rad2 or self.rad3 or self.rad7 or self.rad8 == True) :
-                self.newx = self.currentx
-        if (self.currentx - result_matrix.item(0) > 0) :
-            if (self.rad4 or self.rad5 or self.rad6 == True) :
-                self.newx = self.currentx
-        if (self.currenty - result_matrix.item(1) < 0) :
-            if (self.rad1 or self.rad2 or self.rad3 or self.rad4 or self.rad5 == True) :
-                self.newy = self.currenty
-        if (self.currenty - result_matrix.item(1) > 0) :
-            if (self.rad6 or self.rad7 or self.rad8  == True) :
-                self.newy = self.currenty
-                
-                
-                
-                # Update postion
-                self.x = result_matrix.item(0)
-                self.y = result_matrix.item(1)
-                self.theta = result_matrix.item(2)
+        if (currentx - result_matrix.item(0) < 0) :
+            if (self.rad1 or self.rad2 or self.rad8) :
+                newx = currentx
+        if (currentx - result_matrix.item(0) > 0) :
+            if (self.rad4 or self.rad5 or self.rad6) :
+                newx = currentx
+        if (currenty - result_matrix.item(1) < 0) :
+            if (self.rad2 or self.rad3 or self.rad4) :
+                newy = currenty
+        if (currenty - result_matrix.item(1) > 0) :
+            if (self.rad6 or self.rad7 or self.rad8) :
+                newy = currenty  
+        
+        self.get_logger().info("dX: {} dY: {}, new X: {} Y: {}".format(currentx - result_matrix.item(0), currenty - result_matrix.item(1), newx, newy))
 
-
-
+        # Update postion
+        self.x = newx
+        self.y = newy
+        self.theta = result_matrix.item(2)
         
         self.broadcast()
 
@@ -376,8 +384,8 @@ class Simulator(Node):
     # TODO: Make sure collision is detected properly
     def raycast(self, range_max, angle, mapX, mapY):
         # Robot position
-        posX = self.x
-        posY = self.y
+        posX = self.x+cos(self.theta)*self.robot["body"]["radius"]*0.5
+        posY = self.y+sin(self.theta)*self.robot["body"]["radius"]*0.5
 
         # ray dir
         rayDirX = cos(angle)
@@ -402,17 +410,17 @@ class Simulator(Node):
         #calculate step and initial sideDist
         if rayDirX < 0:
             stepX = -1
-            sideDistX = (posX - mapX*self.map.info.resolution) * deltaDistX
+            sideDistX = (posX - mapX*self.map.info.resolution)/self.map.info.resolution * deltaDistX
         else:
             stepX = 1
-            sideDistX = (mapX*self.map.info.resolution + self.map.info.resolution - posX) * deltaDistX
+            sideDistX = (mapX*self.map.info.resolution + self.map.info.resolution - posX)/self.map.info.resolution * deltaDistX
         
         if rayDirY < 0:
             stepY = -1
-            sideDistY = (posY - mapY*self.map.info.resolution) * deltaDistY
+            sideDistY = (posY - mapY*self.map.info.resolution)/self.map.info.resolution * deltaDistY
         else:
             stepY = 1
-            sideDistY = (mapY*self.map.info.resolution + self.map.info.resolution - posY) * deltaDistY
+            sideDistY = (mapY*self.map.info.resolution + self.map.info.resolution - posY)/self.map.info.resolution * deltaDistY
 
         #perform DDA
         while hit == 0 and dist < range_max:
