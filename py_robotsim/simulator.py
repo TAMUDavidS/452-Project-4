@@ -227,7 +227,7 @@ class Simulator(Node):
             if (self.rad6 or self.rad7 or self.rad8) :
                 newy = currenty  
         
-        self.get_logger().info("dX: {} dY: {}, new X: {} Y: {}".format(currentx - result_matrix.item(0), currenty - result_matrix.item(1), newx, newy))
+        #self.get_logger().info("dX: {} dY: {}, new X: {} Y: {}".format(currentx - result_matrix.item(0), currenty - result_matrix.item(1), newx, newy))
 
         # Update postion
         self.x = newx
