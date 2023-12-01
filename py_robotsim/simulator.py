@@ -49,8 +49,8 @@ class Simulator(Node):
         self.update_timer = self.create_timer(TIMESCALE, self.update_position)
 
         # Create error update timer
-        self.error_right = 0.0
-        self.error_left  = 0.0
+        self.error_right = 1.0
+        self.error_left  = 1.0
         self.error_time  = self.robot['wheels']['error_update_rate']
         self.error_right_base = self.robot['wheels']['error_variance_right']
         self.error_left_base  = self.robot['wheels']['error_variance_left']
@@ -288,8 +288,16 @@ class Simulator(Node):
     
     # Update error on gaussian distribution
     def update_error(self):
-        self.error_left  = np.random.normal(1.0, sqrt(self.error_left_base), 1) if not self.error_left_base == 0.0 else 1.0
-        self.error_right = np.random.normal(1.0, sqrt(self.error_right_base), 1) if not self.error_right_base == 0.0 else 1.0
+        if not self.error_left_base == 0.0:
+            self.error_left  = np.random.normal(1.0, sqrt(self.error_left_base), 1)
+        else:
+            self.error_left  = 1.0
+        if not self.error_right_base == 0.0:
+            self.error_right = np.random.normal(1.0, sqrt(self.error_right_base), 1)
+        else:
+            self.error_right  = 1.0
+        
+        #self.error_right = np.random.normal(1.0, sqrt(self.error_right_base), 1) if not self.error_right_base == 0.0 else 1.0
     
     # Get grid location of robot on the map
     def get_grid_pos(self):

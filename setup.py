@@ -27,6 +27,7 @@ setup(
             'simulator = py_robotsim.simulator:main',
             'translator = py_robotsim.translator:main',
             'map = py_robotsim.map:main',
+            'nav_control = py_robotsim.nav_control:main'
         ],
     },
 )
