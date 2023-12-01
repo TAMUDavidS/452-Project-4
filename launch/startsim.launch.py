@@ -24,8 +24,8 @@ def generate_launch_description():
 
     use_sim_time = LaunchConfiguration('use_sim_time', default='false')
     #robot_file   = LaunchConfiguration('robot_file', default='normal.robot')
-    robot_file = 'robots/ideal.robot'
-    world_file = 'worlds/ell.world'
+    robot_file = 'robots/normal.robot'
+    world_file = 'worlds/windy.world'
 
     robot = disc_robot.load_disc_robot(robot_file)
     robots = json.dumps(robot)
