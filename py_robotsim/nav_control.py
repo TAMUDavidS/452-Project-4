@@ -5,6 +5,8 @@ from rclpy.node import Node
 from geometry_msgs.msg import Twist
 from sensor_msgs.msg import LaserScan
 
+import math
+
 class NavController(Node):
     def __init__(self):
         super().__init__("nav_control_node")
@@ -25,24 +27,31 @@ class NavController(Node):
     def update_movement(self, scan):
         # Scaling factors for movement
         angular_scaling = 0.1
-        angle_error = 0.2
+        angular_vel = 0.2
         movement_speed = 0.2
 
-        # Move towards furthest point?
-        # Get largest distance
-        index = 0
+        # Get min and max range
+        max = 0
+        min = 0
         for i in range(len(scan.ranges)):
-            if scan.ranges[i] > scan.ranges[index]:
-                index = i
+            if scan.ranges[i] > scan.ranges[max]:
+                max = i
+            if scan.ranges[i] < scan.ranges[min]:
+                min = i
         
-        angle = self.get_angle(scan, index)
+        angle_max = self.get_angle(scan, max)
+        angle_min = self.get_angle(scan, min)
 
-        # Move to heading if angle is within bounds or rotate to heading
-        if abs(angle) > angle_error:
-            self.cmd_msg.angular.z = angle*angular_scaling
-        else:
-            self.cmd_msg.linear.x = movement_speed
+        # Keep moving forward
+        self.cmd_msg.linear.x = movement_speed
 
+        # Keep centered by moving away from nearest wall
+        if angle_min == 0:
+            self.cmd_msg.angular.z = angular_vel*(angle_max/abs(angle_max)) # gets sign of largest distance
+        if angle_min > 0:
+            self.cmd_msg.angular.z = -1*angular_vel
+        if angle_min < 0:
+            self.cmd_msg.angular.z = angular_vel
         
 
     
